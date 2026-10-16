@@ -59,6 +59,7 @@ set(OPENSHOT_TESTS
   Profiles
   QtPlayer
   QtImageReader
+  QtPaintReader
   ReaderBase
   Settings
   ScreenCaptureReader
