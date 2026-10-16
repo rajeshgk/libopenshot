@@ -86,6 +86,7 @@ set(OPENSHOT_SOURCES
   Profiles.cpp
   QtHtmlReader.cpp
   QtImageReader.cpp
+  QtPaintReader.cpp
   QtPlayer.cpp
   QtTextReader.cpp
   Settings.cpp
