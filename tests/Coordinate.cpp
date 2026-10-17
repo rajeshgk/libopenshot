@@ -73,3 +73,115 @@ TEST_CASE( "SetJson", "[libopenshot][coordinate]" ) {
 	CHECK(c.X == Approx(100.0).margin(0.01));
 	CHECK(c.Y == Approx(50.0).margin(0.01));
 }
+
+// Verify that partial JSON updates preserve existing coordinate values.
+TEST_CASE("Coordinate JSON partial updates preserve values",
+          "[libopenshot][coordinate][json]")
+{
+    Coordinate coordinate(10.0, 20.0);
+
+    coordinate.SetJson(R"({"X": 15.5})");
+    CHECK(coordinate.X == Approx(15.5));
+    CHECK(coordinate.Y == Approx(20.0));
+
+    coordinate.SetJson(R"({"Y": -7.25})");
+    CHECK(coordinate.X == Approx(15.5));
+    CHECK(coordinate.Y == Approx(-7.25));
+
+    coordinate.SetJson(R"({})");
+    CHECK(coordinate.X == Approx(15.5));
+    CHECK(coordinate.Y == Approx(-7.25));
+}
+
+// Explicit null values must not overwrite existing coordinates.
+TEST_CASE("Coordinate JSON null values preserve coordinates",
+          "[libopenshot][coordinate][json]")
+{
+    Coordinate coordinate(12.0, 34.0);
+
+    coordinate.SetJson(R"({"X": null, "Y": null})");
+
+    CHECK(coordinate.X == Approx(12.0));
+    CHECK(coordinate.Y == Approx(34.0));
+}
+
+// Malformed JSON must raise the established public exception.
+TEST_CASE("Coordinate JSON rejects malformed documents",
+          "[libopenshot][coordinate][json]")
+{
+    Coordinate coordinate(1.0, 2.0);
+
+    CHECK_THROWS_AS(coordinate.SetJson("{"), InvalidJSON);
+    CHECK_THROWS_AS(coordinate.SetJson("not-json"), InvalidJSON);
+    CHECK_THROWS_AS(coordinate.SetJson(R"({"X": 1,)"), InvalidJSON);
+}
+
+// The public JsonCpp interface must remain functional during migration.
+TEST_CASE("Coordinate JsonValue legacy interface",
+          "[libopenshot][coordinate][json]")
+{
+    Coordinate coordinate(3.0, 4.0);
+
+    Json::Value values = coordinate.JsonValue();
+
+    CHECK(values["X"].asDouble() == Approx(3.0));
+    CHECK(values["Y"].asDouble() == Approx(4.0));
+
+    Json::Value update(Json::objectValue);
+    update["X"] = 9.5;
+
+    coordinate.SetJsonValue(update);
+
+    CHECK(coordinate.X == Approx(9.5));
+    CHECK(coordinate.Y == Approx(4.0));
+}
+
+// Preserve JsonCpp 1.9.6 behavior: numeric strings are not doubles.
+TEST_CASE("Coordinate JSON rejects numeric strings",
+          "[libopenshot][coordinate][json]")
+{
+    Coordinate coordinate(1.0, 2.0);
+
+    CHECK_THROWS(coordinate.SetJson(R"({"X":"12.5","Y":"-3.75"})"));
+
+    CHECK(coordinate.X == Approx(1.0));
+    CHECK(coordinate.Y == Approx(2.0));
+}
+
+// Exercise boolean conversion through the legacy JsonCpp boundary.
+TEST_CASE("Coordinate JSON boolean conversion",
+          "[libopenshot][coordinate][json]")
+{
+    Coordinate coordinate(5.0, 6.0);
+
+    coordinate.SetJson(R"({"X":true,"Y":false})");
+
+    CHECK(coordinate.X == Approx(1.0));
+    CHECK(coordinate.Y == Approx(0.0));
+}
+
+// Coordinate JSON documents must be objects.
+TEST_CASE("Coordinate JSON rejects non-object roots",
+          "[libopenshot][coordinate][json]")
+{
+    Coordinate coordinate(1.0, 2.0);
+
+    CHECK_THROWS_AS(coordinate.SetJson("[]"), InvalidJSON);
+    CHECK_THROWS_AS(coordinate.SetJson("[1,2]"), InvalidJSON);
+}
+
+// A JSON null root leaves both coordinates unchanged in JsonCpp.
+TEST_CASE("Coordinate JSON accepts null root",
+          "[libopenshot][coordinate][json]")
+{
+    Coordinate coordinate(5.0, 6.0);
+
+    CHECK_NOTHROW(coordinate.SetJson("null"));
+    CHECK_NOTHROW(coordinate.SetJson("  null  "));
+    CHECK_NOTHROW(coordinate.SetJson("\nnull\n"));
+
+    CHECK(coordinate.X == Approx(5.0));
+    CHECK(coordinate.Y == Approx(6.0));
+
+    CHECK_THROWS_AS(coordinate.SetJson("not-json"), InvalidJSON);
+}
