@@ -11,6 +11,9 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 #include "Coordinate.h"
+#include "QtJsonAdapter.h"
+#include <QJsonObject>
+#include <QJsonValue>
 #include "Exceptions.h"
 
 using namespace openshot;
@@ -52,21 +55,57 @@ Json::Value Coordinate::JsonValue() const {
 // Load JSON string into this object
 void Coordinate::SetJson(const std::string value) {
 
-	// Parse JSON string into JSON objects
-	try
-	{
-		const Json::Value root = openshot::stringToJson(value);
-		// Set all values that match
-		SetJsonValue(root);
-	}
-	catch (const std::exception& e)
-	{
-		// Error parsing JSON (or missing keys)
-		throw InvalidJSON("JSON is invalid (missing keys or invalid data types)");
-	}
+    const std::size_t first =
+        value.find_first_not_of(" \t\r\n");
+
+    if (first != std::string::npos) {
+        const std::size_t last =
+            value.find_last_not_of(" \t\r\n");
+
+        if (value.substr(first, last - first + 1) == "null")
+            return;
+    }
+
+    try {
+        const QJsonDocument document =
+            openshot::detail::parseQtJson(value);
+
+        if (!document.isObject()) {
+            throw InvalidJSON("Coordinate JSON must be an object");
+        }
+
+        const QJsonObject object = document.object();
+
+        Json::Value root(Json::objectValue);
+
+        if (object.contains("X") && !object.value("X").isNull()) {
+            const QJsonValue x = object.value("X");
+            if (x.isDouble())
+                root["X"] = x.toDouble();
+            else if (x.isBool())
+                root["X"] = x.toBool();
+            else if (x.isString())
+                root["X"] = x.toString().toStdString();
+        }
+
+        if (object.contains("Y") && !object.value("Y").isNull()) {
+            const QJsonValue y = object.value("Y");
+            if (y.isDouble())
+                root["Y"] = y.toDouble();
+            else if (y.isBool())
+                root["Y"] = y.toBool();
+            else if (y.isString())
+                root["Y"] = y.toString().toStdString();
+        }
+
+        SetJsonValue(root);
+    }
+    catch (const std::exception&) {
+        throw InvalidJSON(
+            "JSON is invalid (missing keys or invalid data types)");
+    }
 }
 
-// Load Json::Value into this object
 void Coordinate::SetJsonValue(const Json::Value root) {
 
 	// Set data from Json (if key is found)
